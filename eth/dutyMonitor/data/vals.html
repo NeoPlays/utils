@@ -1,0 +1,21 @@
+<h2>🧾 Validators</h2>
+<p>List of validators with their public keys and indices.</p>
+<p>Click on the public key to view more details on beaconcha.in</p>
+<p id="number"></p>
+<ul id="validators-list"></ul>
+
+<script>
+fetch('validators.json')
+  .then(res => res.json())
+  .then(data => {
+    const p = document.getElementById('number');
+    p.innerHTML = `Total number of validators: ${data.length}`;
+    const ul = document.getElementById('validators-list');
+    data.forEach(v => {
+      const li = document.createElement('li');
+      const explorerUrl = `https://hoodi.beaconcha.in/validator/${v.validator.pubkey}`;
+      li.innerHTML = `Index: ${v.index}, Pubkey: <a href="${explorerUrl}" target="_blank">${v.validator.pubkey}</a>`;
+      ul.appendChild(li);
+    });
+  });
+</script>
