@@ -156,23 +156,24 @@ def check_sync_duties(current_epoch):
 def start_loop():
     last_proposer_check = -1
     last_sync_check = -1
+    last_validator_check = -1
+    log.info("Starting duty monitor loop...")
     while True:
         current_epoch, current_slot = get_current_epoch_and_slot()
 
         # Check for proposers every epoch (32 slots) in the 16th slot
         if current_slot % 32 == 16 and current_epoch != last_proposer_check:
-            log.info("New Epoch, Checking Proposer Duties...")
             last_proposer_check = current_epoch
             check_proposer_duties(current_epoch)
 
         # Check for sync duties every 256 epochs with a 1-epoch offset
         if current_epoch % 256 == 1 and current_epoch != last_sync_check:
-            log.info("New Sync, Checking Node...")
             last_sync_check = current_epoch
             check_sync_duties(current_epoch)
 
         # Refresh validators every 32 slots (1 epoch) if the number of pubkeys is not equal to the number of active validators
-        if current_slot % 32 == 0 and len(PUBKEYS) != len(VALIDATORS):
+        if current_slot % 32 == 0 and len(PUBKEYS) != len(VALIDATORS) and last_validator_check != current_epoch:
+            last_validator_check = current_epoch
             get_validators()
         time.sleep(6)
 
