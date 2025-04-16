@@ -15,12 +15,14 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
-# --- Environment Configuration ---
-BEACON_API = os.getenv("BEACON_API", "http://localhost:5052")
-PUBKEYS_FILE = os.getenv("PUBKEYS_FILE", "/data/pubkeys")
-
+DATA_PATH = "/app/data"
 PUBKEYS = []
 VALIDATORS = []
+
+# --- Environment Configuration ---
+BEACON_API = os.getenv("BEACON_API", "http://localhost:5052")
+PUBKEYS_FILE = os.getenv("PUBKEYS_FILE", DATA_PATH + "/pubkeys")
+
 
 # --- Functions ---
 def get_spec_and_genesis():
@@ -70,9 +72,9 @@ def get_validators():
         log.info(f"Fetched {len(data.get('data', []))} validators from Beacon API.")
 
         VALIDATORS = data.get("data", [])
-        with open("/data/validators.json", "w") as f:
+        with open(DATA_PATH + "/validators.json", "w") as f:
             json.dump(data.get("data", []), f, indent=2)
-        log.info(f"Saved validators to /data/validators.json.")
+        log.info(f"Saved validators to " + DATA_PATH + "/validators.json.")
     except requests.exceptions.RequestException as e:
         log.error(f"Error fetching indices: {e}")
         exit(1)
@@ -128,7 +130,7 @@ def check_proposer_duties(current_epoch):
         matching_duties = [d for d in duties if d["validator_index"] in VALIDATORS]
         if matching_duties:
             log.info(f"Found {len(matching_duties)} matching proposer duties for validators.")
-            appendDutiesToFile(matching_duties, "/data/proposer_duties.json")
+            appendDutiesToFile(matching_duties, DATA_PATH + "/proposer_duties.json")
         else:
             log.info("No matching duties found for validators.")
 
@@ -144,7 +146,7 @@ def check_sync_duties(current_epoch):
         duties = response.json().get("data", [])
         if duties and len(duties) > 0:
             log.info(f"Found {len(duties)} sync duties for validators.")
-            appendDutiesToFile(duties, "/data/sync_duties.json")
+            appendDutiesToFile(duties, DATA_PATH + "/sync_duties.json")
         else:
             log.info("No sync duties found for validators.")
 

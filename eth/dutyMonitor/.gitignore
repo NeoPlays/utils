@@ -1,6 +1,4 @@
-data/validators.json
-data/sync_duties.json
-data/proposer_duties.json
+data/*
 *pubkeys*
 
 __pycache__/

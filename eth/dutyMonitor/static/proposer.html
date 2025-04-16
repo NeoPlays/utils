@@ -1,19 +1,19 @@
-<h2>🔄 Sync Duties</h2>
-<ul id="sync-list"></ul>
-<p>List of validators with their public keys and indices.</p>
+<h2>📦 Proposer Duties</h2>
+<ul id="proposer-list"></ul>
+<p>List of proposers with their public keys and indices.</p>
 <p>Click on the public key to view more details on beaconcha.in</p>
 <p id="number"></p>
 
 <script>
-fetch('sync_duties.json')
+fetch('/api/proposer_duties')
   .then(res => res.json())
   .then(data => {
     const p = document.getElementById('number');
-    p.innerHTML = `Total number of sync duties: ${data.length}`;
-    const ul = document.getElementById('sync-list');
+    p.innerHTML = `Total number of proposers: ${data.length}`;
+    const ul = document.getElementById('proposer-list');
     data.forEach(v => {
         const li = document.createElement('li');
-        const explorerUrl = `https://hoodi.beaconcha.in/validator/${v.pubkey}#sync`;
+        const explorerUrl = `https://hoodi.beaconcha.in/validator/${v.pubkey}#blocks`;
         li.innerHTML = `Index: ${v.validator_index}, Pubkey: <a href="${explorerUrl}" target="_blank">${v.pubkey}</a>`;
         ul.appendChild(li);
     });
