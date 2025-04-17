@@ -3,21 +3,34 @@ import time
 import json
 import os
 import logging
-from datetime import datetime
 
 # --- Logging Configuration ---
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[
-        logging.StreamHandler()
-    ]
-)
+LOG_FILE = "/app/data/logs/duty_monitor.log"
+
+# Ensure log directory exists
+os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
+
 log = logging.getLogger(__name__)
+log.setLevel(logging.DEBUG)
+
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.INFO)
+console_formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
+console_handler.setFormatter(console_formatter)
+
+file_handler = logging.FileHandler(LOG_FILE, mode="a")
+file_handler.setLevel(logging.DEBUG)
+file_formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
+file_handler.setFormatter(file_formatter)
+
+log.addHandler(console_handler)
+log.addHandler(file_handler)
 
 DATA_PATH = "/app/data"
 PUBKEYS = []
 VALIDATORS = []
+SPEC = None
+GENESIS = None
 
 # --- Environment Configuration ---
 BEACON_API = os.getenv("BEACON_API", "http://localhost:5052")
@@ -26,12 +39,19 @@ PUBKEYS_FILE = os.getenv("PUBKEYS_FILE", DATA_PATH + "/pubkeys")
 
 # --- Functions ---
 def get_spec_and_genesis():
+    global SPEC, GENESIS
+    if SPEC and GENESIS:
+        return int(GENESIS["genesis_time"]), int(SPEC["SECONDS_PER_SLOT"]), int(SPEC["SLOTS_PER_EPOCH"])
     try:
-        spec = requests.get(f"{BEACON_API}/eth/v1/config/spec").json()["data"]
-        genesis = requests.get(f"{BEACON_API}/eth/v1/beacon/genesis").json()["data"]
-        return int(genesis["genesis_time"]), int(spec["SECONDS_PER_SLOT"]), int(spec["SLOTS_PER_EPOCH"])
+        spec_response = requests.get(f"{BEACON_API}/eth/v1/config/spec")
+        SPEC = spec_response.json()["data"]
+        genesis_response = requests.get(f"{BEACON_API}/eth/v1/beacon/genesis")
+        GENESIS = genesis_response.json()["data"]
+        log.debug(f"Spec response: {SPEC}")
+        log.debug(f"Genesis response: {GENESIS}")
+        return int(GENESIS["genesis_time"]), int(SPEC["SECONDS_PER_SLOT"]), int(SPEC["SLOTS_PER_EPOCH"])
     except requests.exceptions.RequestException as e:
-        log.error(f"Error fetching spec: {e}")
+        log.error(f"Error fetching spec or genesis: {e}")
         exit(1)
 
 def get_current_epoch_and_slot():
@@ -42,14 +62,15 @@ def get_current_epoch_and_slot():
     return current_epoch, current_slot
 
 def get_pubkeys():
-    log.info(f"Reading pubkeys from {PUBKEYS_FILE}...")
+    log.info(f"Reading pubkeys from {PUBKEYS_FILE}")
     with open(PUBKEYS_FILE, "r") as f:
         pubkeys = [line.strip() for line in f.readlines()]
+    log.debug(f"Loaded pubkeys: {pubkeys}")
     return pubkeys
 
 def init_pubkeys():
     global PUBKEYS
-    log.info("Initializing pubkeys...")
+    log.info("Initializing pubkeys")
 
     if not os.path.exists(PUBKEYS_FILE):
         log.error(f"Pubkey file does not exist: {PUBKEYS_FILE}")
@@ -60,127 +81,141 @@ def init_pubkeys():
         log.error(f"Pubkey file is empty: {PUBKEYS_FILE}")
         exit(1)
 
-    log.info(f"Loaded {len(PUBKEYS)} pubkeys from {PUBKEYS_FILE}.")
+    log.info(f"Loaded {len(PUBKEYS)} pubkeys")
 
 def get_validators():
     global VALIDATORS
-    log.info("Fetching validator states...")
+    log.info("Fetching validator states")
 
     try:
         response = requests.post(f"{BEACON_API}/eth/v1/beacon/states/head/validators", json={"ids": PUBKEYS})
         data = response.json()
-        log.info(f"Fetched {len(data.get('data', []))} validators from Beacon API.")
-
         VALIDATORS = data.get("data", [])
+        log.debug(f"Validator response: {VALIDATORS}")
+
         with open(DATA_PATH + "/validators.json", "w") as f:
-            json.dump(data.get("data", []), f, indent=2)
-        log.info(f"Saved validators to " + DATA_PATH + "/validators.json.")
+            json.dump(VALIDATORS, f, indent=2)
+
+        log.info(f"Fetched and saved {len(VALIDATORS)} validators")
     except requests.exceptions.RequestException as e:
-        log.error(f"Error fetching indices: {e}")
+        log.error(f"Error fetching validator states: {e}")
         exit(1)
 
 def check_node():
-    log.info("Checking node status...")
+    log.info("Checking node status")
     if not BEACON_API.startswith(("http://", "https://")):
         log.error(f"Invalid BEACON_API URL: {BEACON_API}")
         exit(1)
 
-    is_syncing = True
-    while is_syncing:
+    while True:
         try:
             response = requests.get(f"{BEACON_API}/eth/v1/node/syncing")
-            is_syncing = response.json()["data"]["is_syncing"]
-            if is_syncing:
-                log.info(f"Node is syncing... {response.json()}")
+            sync_data = response.json()["data"]
+            log.debug(f"Sync status response: {sync_data}")
+            if sync_data["is_syncing"]:
+                log.info("Node still syncing")
                 time.sleep(60)
             else:
-                log.info(f"Node is synced. {response.json()}")
+                log.info("Node is fully synced")
+                get_spec_and_genesis()
+                break
         except requests.exceptions.RequestException as e:
-            log.error(f"Error connecting to node: {e}")
+            log.warning(f"Connection issue while checking sync status: {e}")
             time.sleep(60)
 
 def appendDutiesToFile(duties: dict | list, filename: str):
     try:
-        # Check if the file exists and read existing duties
         if os.path.exists(filename):
             with open(filename, "r") as f:
                 existing_duties = json.load(f)
         else:
             existing_duties = []
-        
-        # Append new duties to the existing list
+
         if isinstance(existing_duties, list):
             existing_duties.extend(duties)
         else:
             existing_duties.append(duties)
 
-        # Write the updated list back to the file
         with open(filename, "w") as f:
             json.dump(existing_duties, f, indent=2)
     except (IOError, json.JSONDecodeError) as e:
-        log.error(f"Error writing duties to file: {e}")
+        log.error(f"Error writing duties to file {filename}: {e}")
         exit(1)
 
 def check_proposer_duties(current_epoch):
-    log.info("Checking proposer duties...")
+    log.info(f"Checking proposer duties for epoch {current_epoch}")
     try:
         response = requests.get(f"{BEACON_API}/eth/v1/validator/duties/proposer/{current_epoch}")
         duties = response.json().get("data", [])
+        log.debug(f"Proposer duties response: {duties}")
+        validator_indices = {v["index"] for v in VALIDATORS}
+        matching_duties = [d for d in duties if d["validator_index"] in validator_indices]
 
-        matching_duties = [d for d in duties if d["validator_index"] in VALIDATORS]
         if matching_duties:
-            log.info(f"Found {len(matching_duties)} matching proposer duties for validators.")
+            log.info(f"{len(matching_duties)} proposer duties match our validators")
             appendDutiesToFile(matching_duties, DATA_PATH + "/proposer_duties.json")
         else:
-            log.info("No matching duties found for validators.")
-
+            log.info("No proposer duties found for our validators")
 
     except requests.exceptions.RequestException as e:
         log.error(f"Error fetching proposer duties: {e}")
         exit(1)
 
 def check_sync_duties(current_epoch):
-    log.info("Checking sync duties...")
+    log.info(f"Checking sync duties for epoch {current_epoch}")
     try:
-        response = requests.post(f"{BEACON_API}/eth/v1/validator/duties/sync/{current_epoch}", json=[v["index"] for v in VALIDATORS])
+        indices = [v["index"] for v in VALIDATORS]
+        response = requests.post(f"{BEACON_API}/eth/v1/validator/duties/sync/{current_epoch}", json=indices)
         duties = response.json().get("data", [])
-        if duties and len(duties) > 0:
-            log.info(f"Found {len(duties)} sync duties for validators.")
+        log.debug(f"Sync duties response: {duties}")
+
+        if duties:
+            log.info(f"Found {len(duties)} sync duties")
             appendDutiesToFile(duties, DATA_PATH + "/sync_duties.json")
         else:
-            log.info("No sync duties found for validators.")
+            log.info("No sync duties for this epoch")
 
     except requests.exceptions.RequestException as e:
         log.error(f"Error fetching sync duties: {e}")
         exit(1)
 
-
 def start_loop():
     last_proposer_check = -1
     last_sync_check = -1
     last_validator_check = -1
-    log.info("Starting duty monitor loop...")
+    log.info("Starting duty monitor loop")
+
     while True:
         current_epoch, current_slot = get_current_epoch_and_slot()
 
-        # Check for proposers every epoch (32 slots) in the 16th slot
         if current_slot % 32 == 16 and current_epoch != last_proposer_check:
             last_proposer_check = current_epoch
             check_proposer_duties(current_epoch)
 
-        # Check for sync duties every 256 epochs with a 1-epoch offset
         if current_epoch % 256 == 1 and current_epoch != last_sync_check:
             last_sync_check = current_epoch
             check_sync_duties(current_epoch)
 
-        # Refresh validators every 32 slots (1 epoch) if the number of pubkeys is not equal to the number of active validators
         if current_slot % 32 == 0 and len(PUBKEYS) != len(VALIDATORS) and last_validator_check != current_epoch:
             last_validator_check = current_epoch
             get_validators()
+
         time.sleep(6)
 
+def logBanner():
+    print("""
+    ____        __              __  ___            _ __            
+   / __ \\__  __/ /___  __      /  |/  /___  ____  (_) /_____  _____
+  / / / / / / / __/ / / /_____/ /|_/ / __ \\/ __ \\/ / __/ __ \\/ ___/
+ / /_/ / /_/ / /_/ /_/ /_____/ /  / / /_/ / / / / / /_/ /_/ / /    
+/_____/\\__,_/\\__/\\__, /     /_/  /_/\\____/_/ /_/_/\\__/\\____/_/     
+                /____/                                             
+""",flush=True)
+                                                     
+
 def monitor():
-    log.info("Starting duty monitor...")
+    logBanner()
+    log.info("Starting duty monitor")
     log.info(f"Beacon API: {BEACON_API}")
     log.info(f"Pubkeys file: {PUBKEYS_FILE}")
     init_pubkeys()
