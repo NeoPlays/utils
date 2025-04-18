@@ -14,7 +14,7 @@ fetch('/api/proposer_duties')
     data.forEach(v => {
         const li = document.createElement('li');
         const explorerUrl = `https://hoodi.beaconcha.in/validator/${v.pubkey}#blocks`;
-        li.innerHTML = `Index: ${v.validator_index}, Pubkey: <a href="${explorerUrl}" target="_blank">${v.pubkey}</a>`;
+        li.innerHTML = `Slot: ${v.slot}, Index: ${v.validator_index}, Pubkey: <a href="${explorerUrl}" target="_blank">${v.pubkey}</a>`;
         ul.appendChild(li);
     });
   });
