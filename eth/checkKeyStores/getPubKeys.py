@@ -30,7 +30,7 @@ def main():
     ap = argparse.ArgumentParser(description="Takes GET/eth/v1/keystores response and outputs pubkeys for given range")
     ap.add_argument("api_response_file", type=str, help="File containing GET/eth/v1/keystores response")
     ap.add_argument("start_index", type=int, help="Start index (inclusive)")
-    ap.add_argument("end_index", type=int, help="End index (exclusive)")
+    ap.add_argument("end_index", type=int, help="End index (inclusive)")
     args = ap.parse_args()
     
     print(f"Reading API response from {args.api_response_file}")
@@ -48,7 +48,7 @@ def main():
             smallest_index = int(index)
         if largest_index is None or int(index) > largest_index:
             largest_index = int(index)
-        if args.start_index <= int(index) < args.end_index:
+        if args.start_index <= int(index) <= args.end_index:
             result_pubkeys.append(pubkey.get('validating_pubkey'))
 
     if len(result_pubkeys) == 0:
