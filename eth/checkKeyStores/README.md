@@ -23,3 +23,14 @@ python checkKeyStores.py <public_keys_file> <keystore_directory>
 # Example
 python checkKeyStores.py ./pubkeys ./keystores
 ```
+
+## `createPWFiles.py`
+This script takes a directory containing keystore files and creates a password file for each keystore file in the same directory.
+The password file will have the same name as the keystore file but with a `.txt` extension.
+
+```bash
+# Usage
+python createPWFiles.py <keystore_directory> <password>
+# Example
+python createPWFiles.py ./keystores mysecretpassword
+```
