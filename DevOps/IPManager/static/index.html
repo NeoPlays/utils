@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>IP Manager</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      min-height: 100vh;
+    }
+
+    header {
+      background: #1a1d27;
+      border-bottom: 1px solid #2d3148;
+      padding: 16px 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    header h1 {
+      font-size: 1.2rem;
+      font-weight: 600;
+      letter-spacing: .03em;
+      color: #a5b4fc;
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .last-scan {
+      font-size: .78rem;
+      color: #64748b;
+    }
+
+    button {
+      cursor: pointer;
+      border: none;
+      border-radius: 6px;
+      font-size: .82rem;
+      font-weight: 500;
+      padding: 7px 14px;
+      transition: background .15s, opacity .15s;
+    }
+
+    button:disabled { opacity: .45; cursor: not-allowed; }
+
+    .btn-primary {
+      background: #6366f1;
+      color: #fff;
+    }
+    .btn-primary:hover:not(:disabled) { background: #4f46e5; }
+
+    .btn-ghost {
+      background: #1e2235;
+      color: #94a3b8;
+      border: 1px solid #2d3148;
+    }
+    .btn-ghost:hover:not(:disabled) { background: #252a3d; color: #e2e8f0; }
+
+    .toolbar {
+      padding: 14px 28px;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      flex-wrap: wrap;
+      background: #13161f;
+      border-bottom: 1px solid #1e2235;
+    }
+
+    .ranges-section {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .ranges-actions {
+      display: flex;
+      gap: 6px;
+      margin-top: 2px;
+    }
+
+    .range-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .toolbar label { font-size: .8rem; color: #64748b; }
+
+    .toolbar input {
+      background: #1a1d27;
+      border: 1px solid #2d3148;
+      border-radius: 6px;
+      color: #e2e8f0;
+      font-size: .82rem;
+      padding: 6px 10px;
+      width: 130px;
+    }
+    .toolbar input:focus { outline: none; border-color: #6366f1; }
+
+    .toolbar input.short { width: 70px; }
+
+    .btn-sm { padding: 4px 8px; font-size: .75rem; }
+
+    .summary {
+      padding: 10px 28px;
+      font-size: .78rem;
+      color: #64748b;
+      display: flex;
+      gap: 18px;
+    }
+
+    .summary span { display: flex; align-items: center; gap: 5px; }
+
+    .dot {
+      width: 8px; height: 8px; border-radius: 50%; display: inline-block;
+    }
+    .dot-up   { background: #22c55e; }
+    .dot-down { background: #ef4444; }
+    .dot-unk  { background: #475569; }
+
+    .table-wrap {
+      padding: 0 28px 40px;
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: .83rem;
+      margin-top: 6px;
+    }
+
+    thead th {
+      text-align: left;
+      padding: 10px 12px;
+      color: #64748b;
+      font-weight: 500;
+      border-bottom: 1px solid #1e2235;
+      white-space: nowrap;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    thead th:hover { color: #a5b4fc; }
+    thead th.sorted { color: #a5b4fc; }
+
+    tbody tr {
+      border-bottom: 1px solid #1a1d27;
+      transition: background .1s;
+    }
+    tbody tr:hover { background: #1a1d27; }
+
+    td { padding: 9px 12px; vertical-align: middle; }
+
+    .ip-cell { font-family: monospace; color: #a5b4fc; font-size: .85rem; }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: .75rem;
+      font-weight: 500;
+    }
+    .badge-up   { background: #14532d44; color: #4ade80; border: 1px solid #16a34a55; }
+    .badge-down { background: #7f1d1d44; color: #f87171; border: 1px solid #dc262655; }
+    .badge-unk  { background: #1e293b;   color: #64748b; border: 1px solid #2d3148;   }
+
+    .label-select {
+      background: #1a1d27;
+      border: 1px solid #2d3148;
+      border-radius: 5px;
+      color: #e2e8f0;
+      font-size: .78rem;
+      padding: 4px 6px;
+    }
+    .label-select:focus { outline: none; border-color: #6366f1; }
+
+    .comment-input {
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: 5px;
+      color: #cbd5e1;
+      font-size: .8rem;
+      padding: 4px 7px;
+      width: 100%;
+      min-width: 180px;
+      transition: border .15s, background .15s;
+    }
+    .comment-input:hover { border-color: #2d3148; background: #1a1d27; }
+    .comment-input:focus { outline: none; border-color: #6366f1; background: #1a1d27; }
+
+    .last-seen { color: #475569; font-size: .75rem; }
+
+    .spinner {
+      display: inline-block;
+      width: 14px; height: 14px;
+      border: 2px solid #6366f1;
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin .6s linear infinite;
+      vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .filter-bar {
+      display: flex; align-items: center; gap: 8px;
+    }
+    .filter-bar input {
+      background: #1a1d27;
+      border: 1px solid #2d3148;
+      border-radius: 6px;
+      color: #e2e8f0;
+      font-size: .8rem;
+      padding: 5px 10px;
+      width: 160px;
+    }
+    .filter-bar input:focus { outline: none; border-color: #6366f1; }
+
+    .filter-bar select {
+      background: #1a1d27;
+      border: 1px solid #2d3148;
+      border-radius: 6px;
+      color: #e2e8f0;
+      font-size: .8rem;
+      padding: 5px 8px;
+    }
+    .filter-bar select:focus { outline: none; border-color: #6366f1; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>IP Manager</h1>
+  <div class="header-right">
+    <span class="last-scan" id="lastScan">Last scan: —</span>
+    <button class="btn-primary" id="scanBtn" onclick="triggerScan()">
+      Scan now
+    </button>
+  </div>
+</header>
+
+<div class="toolbar">
+  <div class="ranges-section">
+    <div id="rangeRows"></div>
+    <div class="ranges-actions">
+      <button class="btn-ghost btn-sm" onclick="addRangeRow()">+ Add range</button>
+      <button class="btn-ghost btn-sm" onclick="saveConfig()">Save ranges</button>
+    </div>
+  </div>
+  <div class="filter-bar" style="margin-left:auto">
+    <input id="searchInput" placeholder="Filter IPs or comments…" oninput="renderTable()" />
+    <select id="statusFilter" onchange="renderTable()">
+      <option value="">All statuses</option>
+      <option value="up">Reachable</option>
+      <option value="down">Unreachable</option>
+      <option value="unknown">Unknown</option>
+    </select>
+    <select id="labelFilter" onchange="renderTable()">
+      <option value="">All labels</option>
+      <option value="unknown">Unknown</option>
+      <option value="free">Free</option>
+      <option value="in-use">In use</option>
+      <option value="reserved">Reserved</option>
+      <option value="vm">VM</option>
+      <option value="device">Device</option>
+      <option value="server">Server</option>
+    </select>
+  </div>
+</div>
+
+<div class="summary" id="summary"></div>
+
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th onclick="sortBy('ip')"   id="th-ip">IP ↕</th>
+        <th onclick="sortBy('status')" id="th-status">Status ↕</th>
+        <th onclick="sortBy('label')"  id="th-label">Label ↕</th>
+        <th>Comment</th>
+        <th onclick="sortBy('last_seen')" id="th-last_seen">Last seen ↕</th>
+      </tr>
+    </thead>
+    <tbody id="tbody"></tbody>
+  </table>
+</div>
+
+<script>
+let allData = {};
+let sortKey = 'ip';
+let sortAsc = true;
+let pendingComments = {};
+
+async function load() {
+  const res = await fetch('/api/data');
+  allData = await res.json();
+  applyConfig();
+  renderSummary();
+  renderTable();
+}
+
+function applyConfig() {
+  const cfg = allData.config || {};
+  const ranges = cfg.ranges || [];
+  const container = document.getElementById('rangeRows');
+  container.innerHTML = '';
+  if (ranges.length === 0) {
+    addRangeRow();
+  } else {
+    ranges.forEach(r => addRangeRow(r.base, r.start, r.end));
+  }
+  const ls = allData.last_scan;
+  document.getElementById('lastScan').textContent = ls
+    ? 'Last scan: ' + new Date(ls).toLocaleString()
+    : 'Last scan: —';
+}
+
+function addRangeRow(base = '', start = 1, end = 254) {
+  const container = document.getElementById('rangeRows');
+  const row = document.createElement('div');
+  row.className = 'range-row';
+  row.innerHTML = `
+    <label>Base IP</label>
+    <input class="range-base" placeholder="e.g. 192.168.1" value="${escHtml(String(base))}" />
+    <label>From</label>
+    <input class="range-start short" type="number" min="0" max="255" value="${start}" />
+    <label>To</label>
+    <input class="range-end short" type="number" min="0" max="255" value="${end}" />
+    <button class="btn-ghost btn-sm" onclick="removeRangeRow(this)">✕</button>
+  `;
+  container.appendChild(row);
+}
+
+function removeRangeRow(btn) {
+  const container = document.getElementById('rangeRows');
+  if (container.children.length > 1) btn.closest('.range-row').remove();
+}
+
+function renderSummary() {
+  const ips = Object.values(allData.ips || {});
+  const up   = ips.filter(e => e.reachable === true).length;
+  const down = ips.filter(e => e.reachable === false).length;
+  const unk  = ips.filter(e => e.reachable === null || e.reachable === undefined).length;
+  document.getElementById('summary').innerHTML = `
+    <span><span class="dot dot-up"></span> ${up} reachable</span>
+    <span><span class="dot dot-down"></span> ${down} unreachable</span>
+    <span><span class="dot dot-unk"></span> ${unk} unknown</span>
+    <span>Total: ${ips.length}</span>`;
+}
+
+function sortBy(key) {
+  if (sortKey === key) sortAsc = !sortAsc;
+  else { sortKey = key; sortAsc = true; }
+  document.querySelectorAll('thead th[id]').forEach(th => {
+    th.classList.toggle('sorted', th.id === 'th-' + key);
+  });
+  renderTable();
+}
+
+function ipToNum(ip) {
+  return ip.split('.').reduce((acc, o) => acc * 256 + parseInt(o), 0);
+}
+
+function renderTable() {
+  const search = document.getElementById('searchInput').value.toLowerCase();
+  const statusF = document.getElementById('statusFilter').value;
+  const labelF  = document.getElementById('labelFilter').value;
+
+  let entries = Object.entries(allData.ips || {}).map(([ip, d]) => ({ ip, ...d }));
+
+  // filter
+  if (search) entries = entries.filter(e =>
+    e.ip.includes(search) || (e.comment || '').toLowerCase().includes(search));
+  if (statusF === 'up')      entries = entries.filter(e => e.reachable === true);
+  if (statusF === 'down')    entries = entries.filter(e => e.reachable === false);
+  if (statusF === 'unknown') entries = entries.filter(e => e.reachable == null);
+  if (labelF)                entries = entries.filter(e => (e.label || 'unknown') === labelF);
+
+  // sort
+  entries.sort((a, b) => {
+    let av, bv;
+    if (sortKey === 'ip') { av = ipToNum(a.ip); bv = ipToNum(b.ip); }
+    else if (sortKey === 'status') { av = a.reachable === true ? 0 : a.reachable === false ? 1 : 2; bv = b.reachable === true ? 0 : b.reachable === false ? 1 : 2; }
+    else if (sortKey === 'label') { av = a.label || ''; bv = b.label || ''; }
+    else if (sortKey === 'last_seen') { av = a.last_seen || ''; bv = b.last_seen || ''; }
+    if (av < bv) return sortAsc ? -1 : 1;
+    if (av > bv) return sortAsc ?  1 : -1;
+    return 0;
+  });
+
+  const tbody = document.getElementById('tbody');
+  tbody.innerHTML = entries.map(e => {
+    const statusBadge = e.reachable === true
+      ? `<span class="status-badge badge-up"><span class="dot dot-up"></span>Up</span>`
+      : e.reachable === false
+        ? `<span class="status-badge badge-down"><span class="dot dot-down"></span>Down</span>`
+        : `<span class="status-badge badge-unk"><span class="dot dot-unk"></span>Unknown</span>`;
+
+    const label = e.label || 'unknown';
+    const comment = pendingComments[e.ip] !== undefined ? pendingComments[e.ip] : (e.comment || '');
+    const ls = e.last_seen ? new Date(e.last_seen).toLocaleString() : '—';
+    const ipKey = e.ip.replace(/\./g, '-');
+
+    return `<tr>
+      <td class="ip-cell">${e.ip}</td>
+      <td>${statusBadge}</td>
+      <td>
+        <select class="label-select" onchange="updateLabel('${e.ip}', this.value)">
+          ${['unknown','free','in-use','reserved','vm','device','server'].map(opt =>
+            `<option value="${opt}" ${label === opt ? 'selected' : ''}>${opt}</option>`).join('')}
+        </select>
+      </td>
+      <td>
+        <input class="comment-input" value="${escHtml(comment)}"
+          data-ip="${e.ip}"
+          onchange="saveComment('${e.ip}', this.value)"
+          oninput="pendingComments['${e.ip}'] = this.value"
+          placeholder="Add a comment…" />
+      </td>
+      <td class="last-seen">${ls}</td>
+    </tr>`;
+  }).join('');
+}
+
+function escHtml(s) {
+  return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+async function saveComment(ip, value) {
+  await fetch(`/api/ip/${ip.replace(/\./g,'-')}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ comment: value }),
+  });
+  delete pendingComments[ip];
+  if (allData.ips[ip]) allData.ips[ip].comment = value;
+}
+
+async function updateLabel(ip, value) {
+  await fetch(`/api/ip/${ip.replace(/\./g,'-')}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ label: value }),
+  });
+  if (allData.ips[ip]) allData.ips[ip].label = value;
+}
+
+async function saveConfig() {
+  const rows = document.querySelectorAll('.range-row');
+  const ranges = [];
+  for (const row of rows) {
+    const base  = row.querySelector('.range-base').value.trim();
+    const start = parseInt(row.querySelector('.range-start').value);
+    const end   = parseInt(row.querySelector('.range-end').value);
+    if (base) ranges.push({ base, start, end });
+  }
+  if (ranges.length === 0) return alert('Enter at least one IP range');
+  await fetch('/api/config', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ranges }),
+  });
+  allData.config = { ranges };
+}
+
+async function triggerScan() {
+  const btn = document.getElementById('scanBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Scanning…';
+  try {
+    const res = await fetch('/api/scan', { method: 'POST' });
+    allData = await res.json();
+    applyConfig();
+    renderSummary();
+    renderTable();
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Scan now';
+  }
+}
+
+load();
+</script>
+</body>
+</html>

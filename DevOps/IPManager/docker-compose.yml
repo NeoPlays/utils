@@ -1,0 +1,12 @@
+services:
+  ipmanager:
+    build: .
+    container_name: ipmanager
+    ports:
+      - "8080:8000"
+    volumes:
+      - ./data:/data
+    # NET_RAW is required for ping inside the container
+    cap_add:
+      - NET_RAW
+    restart: unless-stopped
