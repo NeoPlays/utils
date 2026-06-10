@@ -12,6 +12,7 @@ CONSOLIDATIONS_PATTERN = KEYS_DIR + "/**/consolidations*.json"
 POLL_INTERVAL = int(os.environ.get("POLL_INTERVAL", "60"))
 METRICS_PORT = int(os.environ.get("METRICS_PORT", "8000"))
 FETCH_CHUNK_SIZE = 20
+MAX_TARGET_BALANCE_GWEI = 2048 * 10**9
 
 g_source_count = Gauge(
     "eth_consolidation_source_count",
@@ -23,9 +24,14 @@ g_target_balance = Gauge(
     "Current balance of target validator in gwei",
     ["target"],
 )
+g_target_fill_ratio = Gauge(
+    "eth_consolidation_target_fill_ratio",
+    "Target validator balance as a fraction of max (2048 ETH)",
+    ["target"],
+)
 g_sources_total = Gauge("eth_consolidation_sources_total", "Total number of source validators")
 g_sources_exited = Gauge("eth_consolidation_sources_exited", "Number of source validators that have exited")
-g_progress = Gauge("eth_consolidation_progress_ratio", "Fraction of source validators that have exited (0–1)")
+g_progress = Gauge("eth_consolidation_progress_ratio", "Fraction of total target capacity that has been filled (0–1)")
 
 
 def load_consolidations() -> list[dict]:
@@ -68,12 +74,14 @@ def update_metrics(pairs: list[dict], validator_data: dict[str, dict]) -> None:
 
     total = len(pairs)
     exited = 0
+    total_balance_gwei = 0
 
     for target_pubkey, sources in targets.items():
-        label = short(target_pubkey)
         tv = validator_data.get(target_pubkey)
-        if tv:
-            g_target_balance.labels(target=label).set(int(tv["balance"]))
+        balance = int(tv["balance"]) if tv else 0
+        total_balance_gwei += balance
+        g_target_balance.labels(target=target_pubkey).set(balance)
+        g_target_fill_ratio.labels(target=target_pubkey).set(balance / MAX_TARGET_BALANCE_GWEI)
 
         status_counts: dict[str, int] = {}
         for src_pubkey in sources:
@@ -84,11 +92,12 @@ def update_metrics(pairs: list[dict], validator_data: dict[str, dict]) -> None:
                 exited += 1
 
         for status, count in status_counts.items():
-            g_source_count.labels(target=label, status=status).set(count)
+            g_source_count.labels(target=target_pubkey, status=status).set(count)
 
+    total_capacity_gwei = len(targets) * MAX_TARGET_BALANCE_GWEI
     g_sources_total.set(total)
     g_sources_exited.set(exited)
-    g_progress.set(exited / total if total else 0)
+    g_progress.set(total_balance_gwei / total_capacity_gwei if total_capacity_gwei else 0)
 
 
 def render(pairs: list[dict], validator_data: dict[str, dict]) -> None:

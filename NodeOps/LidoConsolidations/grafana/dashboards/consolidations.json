@@ -91,6 +91,58 @@
       ]
     },
     {
+      "id": 5,
+      "type": "table",
+      "title": "Target Key Balances",
+      "gridPos": { "x": 0, "y": 18, "w": 11, "h": 12 },
+      "options": {
+        "cellHeight": "sm",
+        "showHeader": true,
+        "sortBy": [{ "desc": true, "displayName": "Value" }]
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "align": "left",
+            "cellOptions": { "type": "auto" },
+            "filterable": false,
+            "inspect": false
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "target" },
+            "properties": [{ "id": "custom.width" }]
+          }
+        ]
+      },
+      "transformations": [
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": { "names": ["target", "Value"] }
+          }
+        }
+      ],
+      "targets": [
+        {
+          "expr": "eth_consolidation_target_balance_gwei",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "__auto",
+          "refId": "A"
+        }
+      ]
+    },
+    {
       "id": 4,
       "type": "timeseries",
       "title": "Source Validator Status Breakdown",
