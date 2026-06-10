@@ -20,8 +20,8 @@ g_source_count = Gauge(
     ["target", "status"],
 )
 g_target_balance = Gauge(
-    "eth_consolidation_target_balance_gwei",
-    "Current balance of target validator in gwei",
+    "eth_consolidation_target_balance_eth",
+    "Current balance of target validator in ETH",
     ["target"],
 )
 g_target_fill_ratio = Gauge(
@@ -80,7 +80,7 @@ def update_metrics(pairs: list[dict], validator_data: dict[str, dict]) -> None:
         tv = validator_data.get(target_pubkey)
         balance = int(tv["balance"]) if tv else 0
         total_balance_gwei += balance
-        g_target_balance.labels(target=target_pubkey).set(balance)
+        g_target_balance.labels(target=target_pubkey).set(balance / 10**9)
         g_target_fill_ratio.labels(target=target_pubkey).set(balance / MAX_TARGET_BALANCE_GWEI)
 
         status_counts: dict[str, int] = {}

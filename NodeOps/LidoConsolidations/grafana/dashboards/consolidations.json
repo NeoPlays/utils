@@ -85,7 +85,7 @@
       },
       "targets": [
         {
-          "expr": "eth_consolidation_target_balance_gwei / 1e9",
+          "expr": "eth_consolidation_target_balance_eth",
           "legendFormat": "{{target}}"
         }
       ]
@@ -120,7 +120,7 @@
         "overrides": [
           {
             "matcher": { "id": "byName", "options": "target" },
-            "properties": [{ "id": "custom.width" }]
+            "properties": [{ "id": "custom.width", "value": 820 }]
           }
         ]
       },
@@ -134,7 +134,7 @@
       ],
       "targets": [
         {
-          "expr": "eth_consolidation_target_balance_gwei",
+          "expr": "eth_consolidation_target_balance_eth",
           "format": "table",
           "instant": true,
           "legendFormat": "__auto",
