@@ -30,8 +30,9 @@ g_target_fill_ratio = Gauge(
     ["target"],
 )
 g_sources_total = Gauge("eth_consolidation_sources_total", "Total number of source validators")
-g_sources_exited = Gauge("eth_consolidation_sources_exited", "Number of source validators that have exited")
-g_progress = Gauge("eth_consolidation_progress_ratio", "Fraction of total target capacity that has been filled (0–1)")
+g_sources_exited = Gauge("eth_consolidation_sources_exited", "Number of source validators that have exited (balance not yet swept)")
+g_sources_withdrawn = Gauge("eth_consolidation_sources_withdrawn", "Number of source validators with withdrawal_done (balance fully swept to target)")
+g_progress = Gauge("eth_consolidation_progress_ratio", "Fraction of source validators fully withdrawn (0-1)")
 
 
 def load_consolidations() -> list[dict]:
@@ -74,12 +75,11 @@ def update_metrics(pairs: list[dict], validator_data: dict[str, dict]) -> None:
 
     total = len(pairs)
     exited = 0
-    total_balance_gwei = 0
+    withdrawn = 0
 
     for target_pubkey, sources in targets.items():
         tv = validator_data.get(target_pubkey)
         balance = int(tv["balance"]) if tv else 0
-        total_balance_gwei += balance
         g_target_balance.labels(target=target_pubkey).set(balance / 10**9)
         g_target_fill_ratio.labels(target=target_pubkey).set(balance / MAX_TARGET_BALANCE_GWEI)
 
@@ -88,16 +88,18 @@ def update_metrics(pairs: list[dict], validator_data: dict[str, dict]) -> None:
             sv = validator_data.get(src_pubkey)
             src_status = sv["status"] if sv else "unknown"
             status_counts[src_status] = status_counts.get(src_status, 0) + 1
-            if src_status.startswith(("exited", "withdrawal")):
+            if src_status.startswith("exited"):
                 exited += 1
+            elif src_status == "withdrawal_done":
+                withdrawn += 1
 
         for status, count in status_counts.items():
             g_source_count.labels(target=target_pubkey, status=status).set(count)
 
-    total_capacity_gwei = len(targets) * MAX_TARGET_BALANCE_GWEI
     g_sources_total.set(total)
     g_sources_exited.set(exited)
-    g_progress.set(total_balance_gwei / total_capacity_gwei if total_capacity_gwei else 0)
+    g_sources_withdrawn.set(withdrawn)
+    g_progress.set(withdrawn / total if total else 0)
 
 
 def render(pairs: list[dict], validator_data: dict[str, dict]) -> None:
@@ -107,6 +109,7 @@ def render(pairs: list[dict], validator_data: dict[str, dict]) -> None:
 
     total = len(pairs)
     exited = 0
+    withdrawn = 0
 
     print("\033[2J\033[H", end="")  # clear screen
     for target_pubkey, sources in targets.items():
@@ -120,15 +123,17 @@ def render(pairs: list[dict], validator_data: dict[str, dict]) -> None:
             sv = validator_data.get(src_pubkey)
             src_status = sv["status"] if sv else "unknown"
             status_counts[src_status] = status_counts.get(src_status, 0) + 1
-            if src_status.startswith(("exited", "withdrawal")):
+            if src_status.startswith("exited"):
                 exited += 1
+            elif src_status == "withdrawal_done":
+                withdrawn += 1
 
         for s, count in sorted(status_counts.items()):
             print(f"  {count:>4}x  {s}")
         print()
 
-    pct = 100 * exited // total if total else 0
-    print(f"Progress: {exited}/{total} sources exited ({pct}%)")
+    pct = 100 * withdrawn // total if total else 0
+    print(f"Progress: {withdrawn}/{total} fully withdrawn, {exited} exited pending sweep ({pct}%)")
     print(f"Metrics:  http://localhost:{METRICS_PORT}/metrics")
     print(f"Updated:  {time.strftime('%Y-%m-%d %H:%M:%S')}  (every {POLL_INTERVAL}s)")
 
@@ -151,11 +156,11 @@ def main():
             render(pairs, validator_data)
 
             all_done = all(
-                validator_data.get(p["source"], {}).get("status", "").startswith(("exited", "withdrawal"))
+                validator_data.get(p["source"], {}).get("status", "") == "withdrawal_done"
                 for p in pairs
             )
             if all_done:
-                print("\nAll source validators have exited. Consolidations complete.")
+                print("\nAll source validators fully withdrawn. Consolidations complete.")
                 break
         except requests.RequestException as e:
             print(f"Beacon node error: {e}")
