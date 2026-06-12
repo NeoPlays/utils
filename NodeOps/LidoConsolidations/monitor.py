@@ -77,6 +77,8 @@ def update_metrics(pairs: list[dict], validator_data: dict[str, dict]) -> None:
     exited = 0
     withdrawn = 0
 
+    g_source_count.clear()
+
     for target_pubkey, sources in targets.items():
         tv = validator_data.get(target_pubkey)
         balance = int(tv["balance"]) if tv else 0
