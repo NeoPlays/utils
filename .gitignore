@@ -1,3 +1,6 @@
 .venv
 .DS_Store
 .env
+NodeOps/LidoConsolidations/
+NodeOps/prepareVM/
+__pycache__/
